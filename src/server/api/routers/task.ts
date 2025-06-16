@@ -1,11 +1,12 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { Priority } from "@prisma/client";
 
 // Zod schema for task validation
 const taskCreateSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title is too long"),
   description: z.string().optional(),
-  priority: z.enum(["LOW", "MEDIUM", "HIGH"]).default("MEDIUM"),
+  priority: z.nativeEnum(Priority).default(Priority.MEDIUM),
   category: z.string().max(50).optional(),
   dueDate: z.date().optional(),
 });
@@ -19,7 +20,7 @@ export const taskRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
     return await ctx.db.task.findMany({
       where: {
-        userId: ctx.session.user.id,
+        userId: ctx.session.user.id!,
       },
       orderBy: [
         { completed: "asc" }, // Show incomplete tasks first
@@ -35,7 +36,7 @@ export const taskRouter = createTRPCRouter({
       const task = await ctx.db.task.findFirst({
         where: {
           id: input.id,
-          userId: ctx.session.user.id,
+          userId: ctx.session.user.id!,
         },
       });
 
@@ -52,8 +53,12 @@ export const taskRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       return await ctx.db.task.create({
         data: {
-          ...input,
-          userId: ctx.session.user.id,
+          title: input.title,
+          description: input.description,
+          priority: input.priority,
+          category: input.category,
+          dueDate: input.dueDate,
+          userId: ctx.session.user.id!,
         },
       });
     }),
@@ -71,7 +76,7 @@ export const taskRouter = createTRPCRouter({
       const existingTask = await ctx.db.task.findFirst({
         where: {
           id: input.id,
-          userId: ctx.session.user.id,
+          userId: ctx.session.user.id!,
         },
       });
 
@@ -92,7 +97,7 @@ export const taskRouter = createTRPCRouter({
       const task = await ctx.db.task.findFirst({
         where: {
           id: input.id,
-          userId: ctx.session.user.id,
+          userId: ctx.session.user.id!,
         },
       });
 
@@ -114,7 +119,7 @@ export const taskRouter = createTRPCRouter({
       const existingTask = await ctx.db.task.findFirst({
         where: {
           id: input.id,
-          userId: ctx.session.user.id,
+          userId: ctx.session.user.id!,
         },
       });
 
@@ -131,7 +136,7 @@ export const taskRouter = createTRPCRouter({
   getStats: protectedProcedure.query(async ({ ctx }) => {
     const tasks = await ctx.db.task.findMany({
       where: {
-        userId: ctx.session.user.id,
+        userId: ctx.session.user.id!,
       },
       select: {
         completed: true,
@@ -152,9 +157,9 @@ export const taskRouter = createTRPCRouter({
     ).length;
 
     const priorityBreakdown = {
-      HIGH: tasks.filter((task) => task.priority === "HIGH").length,
-      MEDIUM: tasks.filter((task) => task.priority === "MEDIUM").length,
-      LOW: tasks.filter((task) => task.priority === "LOW").length,
+      HIGH: tasks.filter((task) => task.priority === Priority.HIGH).length,
+      MEDIUM: tasks.filter((task) => task.priority === Priority.MEDIUM).length,
+      LOW: tasks.filter((task) => task.priority === Priority.LOW).length,
     };
 
     return {
